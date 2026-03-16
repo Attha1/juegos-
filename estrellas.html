@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Estrellas</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #000; display: flex; align-items: center; justify-content: center; height: 100vh; overflow: hidden; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+const W = canvas.width  = 800;
+const H = canvas.height = 800;
+
+class Star {
+  constructor() {
+    this.r  = Math.random() * W / 2;
+    this.a  = Math.random() * Math.PI * 2;
+    this.rs = Math.random() * (0.006 - 0.002) + 0.002; // velocidad radial
+    this.ar = Math.random() * (0.006 - 0.002) + 0.002; // velocidad angular
+    this.sz = Math.random() < 0.5 ? 1 : 2;
+  }
+  move() {
+    this.r += this.rs;
+    this.a += this.ar;
+    if (this.r > W / 2) {
+      this.r = 0;
+      this.a = Math.random() * Math.PI * 2;
+    }
+  }
+  draw() {
+    const x = W / 2 + Math.cos(this.a) * this.r;
+    const y = H / 2 + Math.sin(this.a) * this.r;
+    ctx.beginPath();
+    ctx.arc(x, y, this.sz, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+  }
+}
+
+const Stars = Array.from({ length: 500 }, () => new Star());
+
+function loop() {
+  ctx.fillStyle = '#000000';
+  ctx.fillRect(0, 0, W, H);
+  for (const s of Stars) { s.move(); s.draw(); }
+  requestAnimationFrame(loop);
+}
+
+loop();
+</script>
+</body>
+</html>
