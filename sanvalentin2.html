@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>💕 Para ti</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Pacifico&family=Nunito:wght@400;700;900&display=swap');
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  min-height: 100vh;
+  background: linear-gradient(160deg, #ffe0ee 0%, #ffd6e7 40%, #fce4f5 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  font-family: 'Nunito', sans-serif;
+  overflow: hidden;
+  cursor: default;
+}
+
+/* ---- FONDO BURBUJAS ---- */
+.bub {
+  position: fixed;
+  border-radius: 50%;
+  pointer-events: none;
+  animation: rise linear infinite;
+  opacity: .35;
+}
+@keyframes rise {
+  0%   { transform: translateY(110vh) scale(1); opacity:.4; }
+  100% { transform: translateY(-10vh)  scale(1.1); opacity:0; }
+}
+
+/* ---- ESTRELLITAS ---- */
+.sparkle {
+  position: fixed;
+  pointer-events: none;
+  font-size: 14px;
+  animation: twinkle ease-in-out infinite;
+  opacity: 0;
+}
+@keyframes twinkle {
+  0%,100% { opacity:0; transform:scale(.5) rotate(0deg); }
+  50%      { opacity:1; transform:scale(1.2) rotate(20deg); }
+}
+
+/* ---- TARJETA ---- */
+#card {
+  background: rgba(255,255,255,.72);
+  backdrop-filter: blur(14px);
+  border-radius: 36px;
+  padding: 44px 52px 48px;
+  box-shadow: 0 12px 50px rgba(255,100,160,.22), 0 2px 0 rgba(255,255,255,.9) inset;
+  border: 2.5px solid rgba(255,180,210,.55);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  max-width: 440px;
+  width: 90vw;
+  position: relative;
+  animation: popCard .7s cubic-bezier(.36,.07,.19,.97);
+}
+@keyframes popCard {
+  0%   { transform:scale(.5) rotate(-4deg); opacity:0; }
+  75%  { transform:scale(1.04) rotate(1deg); }
+  100% { transform:scale(1) rotate(0deg); opacity:1; }
+}
+
+/* ---- OSO KAWAII SVG ---- */
+#bear-wrap {
+  position: relative;
+  margin-bottom: 6px;
+  cursor: pointer;
+  user-select: none;
+  transition: transform .15s;
+}
+#bear-wrap:hover { transform: scale(1.06) rotate(-2deg); }
+#bear-svg {
+  width: 160px;
+  height: 160px;
+  filter: drop-shadow(0 6px 18px rgba(220,120,160,.35));
+  transition: filter .2s;
+}
+#bear-wrap:hover #bear-svg { filter: drop-shadow(0 6px 28px rgba(255,80,140,.55)); }
+
+/* Corazón encima del oso */
+#bear-heart {
+  position: absolute;
+  top: -14px; right: -8px;
+  font-size: 28px;
+  animation: floatHeart 2s ease-in-out infinite;
+  filter: drop-shadow(0 2px 6px rgba(255,60,120,.5));
+  cursor: pointer;
+}
+@keyframes floatHeart {
+  0%,100% { transform: translateY(0) scale(1); }
+  50%      { transform: translateY(-7px) scale(1.15); }
+}
+
+/* ---- TEXTOS ---- */
+#from {
+  font-family: 'Pacifico', cursive;
+  color: #e05080;
+  font-size: 15px;
+  letter-spacing: 3px;
+  margin-top: 6px;
+  opacity: .75;
+}
+#question {
+  font-family: 'Pacifico', cursive;
+  font-size: 27px;
+  color: #d03060;
+  text-align: center;
+  margin: 20px 0 8px;
+  line-height: 1.3;
+  text-shadow: 0 2px 10px rgba(220,80,130,.2);
+}
+#sub {
+  font-size: 13px;
+  color: #c06080;
+  opacity: .8;
+  margin-bottom: 26px;
+  text-align: center;
+}
+
+/* ---- BOTONES ---- */
+#btns { display: flex; gap: 18px; margin-top: 4px; }
+
+.btn-yes {
+  background: linear-gradient(135deg, #ff6b9d, #ff4477);
+  color: #fff;
+  border: none;
+  padding: 15px 40px;
+  font-size: 20px;
+  font-family: 'Nunito', sans-serif;
+  font-weight: 900;
+  border-radius: 50px;
+  cursor: pointer;
+  box-shadow: 0 5px 20px rgba(255,70,120,.4), 0 1px 0 rgba(255,255,255,.3) inset;
+  transition: transform .12s, box-shadow .15s;
+  letter-spacing: 1px;
+}
+.btn-yes:hover { transform: scale(1.1) rotate(-2deg); box-shadow: 0 8px 28px rgba(255,70,120,.6); }
+.btn-yes:active { transform: scale(.95); }
+
+.btn-no {
+  background: rgba(255,255,255,.6);
+  color: #e07090;
+  border: 2px solid rgba(255,150,180,.4);
+  padding: 15px 40px;
+  font-size: 20px;
+  font-family: 'Nunito', sans-serif;
+  font-weight: 700;
+  border-radius: 50px;
+  cursor: pointer;
+  transition: transform .12s, font-size .25s, opacity .25s;
+}
+
+/* ---- CORAZÓN CONTADOR ---- */
+#hearts-row {
+  display: flex;
+  gap: 6px;
+  margin: 10px 0 4px;
+  min-height: 36px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.mini-heart {
+  font-size: 24px;
+  animation: popHeart .4s cubic-bezier(.36,.07,.19,.97);
+}
+@keyframes popHeart {
+  0%   { transform: scale(0) rotate(-20deg); opacity:0; }
+  70%  { transform: scale(1.3) rotate(5deg); }
+  100% { transform: scale(1) rotate(0deg); opacity:1; }
+}
+
+/* ---- PANTALLA FINAL ---- */
+#finale {
+  position: fixed; inset: 0;
+  background: linear-gradient(160deg, #ffe0ee, #ffd6e7, #fce4f5);
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 30;
+  animation: fadeIn .5s;
+}
+@keyframes fadeIn { from{opacity:0} to{opacity:1} }
+#finale .bear2 {
+  font-size: 90px;
+  animation: popIn .6s cubic-bezier(.36,.07,.19,.97), wiggle 2s .6s ease-in-out infinite;
+}
+@keyframes popIn { 0%{transform:scale(0)}75%{transform:scale(1.15)}100%{transform:scale(1)} }
+@keyframes wiggle { 0%,100%{transform:rotate(-5deg)}50%{transform:rotate(5deg)} }
+#finale h2 {
+  font-family: 'Pacifico', cursive;
+  color: #d03060;
+  font-size: 38px;
+  margin-top: 18px;
+  text-shadow: 0 3px 12px rgba(220,80,130,.25);
+  animation: fadeIn .5s .4s both;
+  text-align: center;
+}
+#finale p {
+  font-size: 17px;
+  color: #c06080;
+  margin-top: 10px;
+  text-align: center;
+  line-height: 1.6;
+  animation: fadeIn .5s .7s both;
+  padding: 0 30px;
+}
+.hearts-rain {
+  position: fixed; inset: 0;
+  pointer-events: none;
+  z-index: 29;
+}
+
+/* ---- MENSAJE NO ---- */
+#no-msg {
+  font-size: 12px;
+  color: #e090b0;
+  text-align: center;
+  margin-top: 8px;
+  min-height: 18px;
+  opacity: 0;
+  transition: opacity .3s;
+}
+</style>
+</head>
+<body>
+
+<div id="bubs"></div>
+<div id="sparks"></div>
+
+<div id="card">
+  <!-- Osito kawaii -->
+  <div id="bear-wrap" title="Tócame 🥺">
+    <div id="bear-heart">💗</div>
+    <svg id="bear-svg" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+      <!-- Orejas -->
+      <circle cx="58"  cy="54" r="26" fill="#f5c5d5"/>
+      <circle cx="142" cy="54" r="26" fill="#f5c5d5"/>
+      <circle cx="58"  cy="54" r="15" fill="#ffaec5"/>
+      <circle cx="142" cy="54" r="15" fill="#ffaec5"/>
+      <!-- Cuerpo -->
+      <ellipse cx="100" cy="140" rx="54" ry="48" fill="#f5c5d5"/>
+      <!-- Cabeza -->
+      <circle cx="100" cy="100" r="60" fill="#f9d8e6"/>
+      <!-- Panza -->
+      <ellipse cx="100" cy="148" rx="34" ry="28" fill="#ffe0ee"/>
+      <!-- Ojos -->
+      <circle cx="78"  cy="95" r="12" fill="#fff"/>
+      <circle cx="122" cy="95" r="12" fill="#fff"/>
+      <circle cx="81"  cy="95" r="7"  fill="#3a2030"/>
+      <circle cx="125" cy="95" r="7"  fill="#3a2030"/>
+      <!-- Brillo ojos -->
+      <circle cx="84"  cy="91" r="2.5" fill="#fff"/>
+      <circle cx="128" cy="91" r="2.5" fill="#fff"/>
+      <!-- Nariz -->
+      <ellipse cx="100" cy="115" rx="10" ry="7" fill="#e07090"/>
+      <!-- Sonrisa -->
+      <path d="M85 124 Q100 137 115 124" stroke="#c05070" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <!-- Cachetes -->
+      <circle cx="68"  cy="118" r="13" fill="#ffb0c8" opacity=".55"/>
+      <circle cx="132" cy="118" r="13" fill="#ffb0c8" opacity=".55"/>
+      <!-- Bracitos -->
+      <ellipse cx="46"  cy="148" rx="16" ry="22" fill="#f5c5d5" transform="rotate(-18 46 148)"/>
+      <ellipse cx="154" cy="148" rx="16" ry="22" fill="#f5c5d5" transform="rotate(18 154 148)"/>
+      <!-- Corazón en panza -->
+      <text x="100" y="158" text-anchor="middle" font-size="22">💕</text>
+    </svg>
+  </div>
+
+  <div id="from">— para ti —</div>
+
+  <div id="question">¿Quieres ser<br>mi valentín? 🌷</div>
+  <div id="sub">Piénsalo bien antes de responder 🥺</div>
+
+  <div id="hearts-row"></div>
+
+  <div id="btns">
+    <button class="btn-yes" id="si">💖 ¡Sí quiero!</button>
+    <button class="btn-no"  id="no">No...</button>
+  </div>
+
+  <div id="no-msg"></div>
+</div>
+
+<!-- Pantalla final -->
+<div id="finale">
+  <div class="hearts-rain" id="rain"></div>
+  <div class="bear2">🐻</div>
+  <h2>¡Yay! ¡Lo sabía! 🥰</h2>
+  <p>Eres mi persona favorita.<br>Gracias por hacerme tan feliz.<br><b style="color:#e05080">Te quiero muchísimo 💕</b></p>
+</div>
+
+<script>
+// === BURBUJAS DE FONDO ===
+for(let i=0;i<18;i++){
+  const b=document.createElement('div'); b.className='bub';
+  const sz=20+Math.random()*60;
+  b.style.cssText=`width:${sz}px;height:${sz}px;left:${Math.random()*100}vw;bottom:-${sz}px;
+    background:${['#ffaec8','#ffcce0','#ffd6eb','#ffe0f0','#ffb8d4'][Math.floor(Math.random()*5)]};
+    animation-duration:${6+Math.random()*10}s;animation-delay:${Math.random()*8}s;`;
+  document.getElementById('bubs').appendChild(b);
+}
+
+// === ESTRELLITAS ===
+for(let i=0;i<22;i++){
+  const s=document.createElement('div'); s.className='sparkle';
+  s.textContent=['✨','⭐','💫','🌟','✦'][Math.floor(Math.random()*5)];
+  s.style.cssText=`left:${Math.random()*100}vw;top:${Math.random()*100}vh;
+    animation-duration:${2+Math.random()*3}s;animation-delay:${Math.random()*4}s;`;
+  document.getElementById('sparks').appendChild(s);
+}
+
+// === CORAZÓN CRECE CON EL RATÓN ===
+const bearHeart=document.getElementById('bear-heart');
+const bearWrap=document.getElementById('bear-wrap');
+let heartSize=28, growing=false;
+
+bearHeart.addEventListener('mousemove',()=>{
+  heartSize=Math.min(heartSize+4,110);
+  bearHeart.style.fontSize=heartSize+'px';
+  bearHeart.style.top=(heartSize>50?-heartSize/2.5+'px':'-14px');
+  bearHeart.style.right=(heartSize>50?-heartSize/3+'px':'-8px');
+  // Color va cambiando
+  const glow=`drop-shadow(0 0 ${heartSize*.3}px rgba(255,60,120,.7))`;
+  bearHeart.style.filter=glow;
+});
+bearHeart.addEventListener('mouseleave',()=>{
+  const shrink=setInterval(()=>{
+    heartSize=Math.max(28,heartSize-3);
+    bearHeart.style.fontSize=heartSize+'px';
+    bearHeart.style.top=heartSize>50?-heartSize/2.5+'px':'-14px';
+    bearHeart.style.right=heartSize>50?-heartSize/3+'px':'-8px';
+    if(heartSize<=28){clearInterval(shrink);bearHeart.style.filter='';}
+  },18);
+});
+
+// También crece al mover el ratón sobre el oso entero
+bearWrap.addEventListener('mousemove',e=>{
+  // Chispas al mover el ratón
+  if(Math.random()<.35) makeSparkAt(e.clientX,e.clientY);
+});
+
+bearWrap.addEventListener('click',()=>{
+  heartSize=Math.min(heartSize+20,110);
+  bearHeart.style.fontSize=heartSize+'px';
+  // Añadir mini corazón en fila
+  addMiniHeart();
+  // Oso reacciona
+  bearWrap.style.transform='scale(1.15) rotate(-4deg)';
+  setTimeout(()=>bearWrap.style.transform='',300);
+});
+
+// === MINI CORAZONES EN FILA ===
+const heartsRow=document.getElementById('hearts-row');
+let heartCount=0;
+function addMiniHeart(){
+  if(heartCount>=12) return;
+  heartCount++;
+  const h=document.createElement('span'); h.className='mini-heart';
+  h.textContent=['💕','💗','💖','❤️','🩷'][Math.floor(Math.random()*5)];
+  heartsRow.appendChild(h);
+}
+
+// === CHISPA AL MOVER ===
+function makeSparkAt(x,y){
+  const s=document.createElement('div');
+  s.style.cssText=`position:fixed;left:${x}px;top:${y}px;pointer-events:none;z-index:50;font-size:${10+Math.random()*12}px;animation:twinkle .6s ease both;`;
+  s.textContent=['✨','💫','🌸','💕'][Math.floor(Math.random()*4)];
+  document.body.appendChild(s);
+  setTimeout(()=>s.remove(),650);
+}
+document.addEventListener('mousemove',e=>{
+  if(Math.random()<.07) makeSparkAt(e.clientX,e.clientY);
+});
+
+// === BOTÓN SÍ ===
+document.getElementById('si').addEventListener('click',()=>{
+  document.getElementById('finale').style.display='flex';
+  rainHearts();
+});
+
+// === BOTÓN NO — escapa y da mensajitos ===
+const noBtn=document.getElementById('no');
+const noMsg=document.getElementById('no-msg');
+const msgs=['¡Anda ya! 🥺','¡No puede ser! 😢','¡Inténtalo de nuevo! 🙏','¡Seguro que sí! 💕','¡Yo sé que quieres! 🐻'];
+let noCount=0;
+noBtn.addEventListener('mouseover',()=>{
+  // Escapa a posición random
+  const maxX=Math.min(180, window.innerWidth*.35);
+  const maxY=Math.min(120, window.innerHeight*.2);
+  noBtn.style.position='relative';
+  noBtn.style.left=(Math.random()-.5)*maxX*2+'px';
+  noBtn.style.top=(Math.random()-.5)*maxY*2+'px';
+  noBtn.style.fontSize=Math.max(10,20-noCount*2)+'px';
+  noBtn.style.opacity=Math.max(.2,1-noCount*.15)+'';
+  noMsg.textContent=msgs[noCount%msgs.length];
+  noMsg.style.opacity='1';
+  noCount++;
+  if(noCount>=5){
+    noBtn.style.display='none';
+    noMsg.textContent='¡Se fue el botón! Solo queda una opción 🥰';
+  }
+});
+
+// === LLUVIA DE CORAZONES ===
+function rainHearts(){
+  const rain=document.getElementById('rain');
+  const emojis=['💖','💕','💗','❤️','🩷','💝','🌸','✨'];
+  for(let i=0;i<60;i++){
+    setTimeout(()=>{
+      const h=document.createElement('div');
+      h.style.cssText=`position:fixed;left:${Math.random()*100}vw;top:-30px;font-size:${18+Math.random()*28}px;
+        pointer-events:none;animation:fall ${2+Math.random()*3}s linear forwards;`;
+      h.textContent=emojis[Math.floor(Math.random()*emojis.length)];
+      rain.appendChild(h);
+      setTimeout(()=>h.remove(),5000);
+    },i*80);
+  }
+}
+
+// Estilo fall en JS (no está en CSS)
+const st=document.createElement('style');
+st.textContent=`@keyframes fall{0%{transform:translateY(-30px) rotate(0);opacity:1}100%{transform:translateY(110vh) rotate(360deg);opacity:0}}`;
+document.head.appendChild(st);
+</script>
+</body>
+</html>
