@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Escapa de la Serpiente</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #091208;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      font-family: 'Courier New', monospace;
+    }
+    h1 {
+      color: #5ddb5d;
+      font-size: 2rem;
+      text-shadow: 0 0 20px #5ddb5d88;
+      margin-bottom: 10px;
+      letter-spacing: 4px;
+    }
+    #hud {
+      color: #aaa;
+      font-size: 1rem;
+      margin-bottom: 8px;
+      display: flex;
+      gap: 30px;
+    }
+    #hud span { color: #5ddb5d; }
+    canvas {
+      border: 2px solid #2a5a2a;
+      box-shadow: 0 0 40px #00ff0022, 0 0 80px #00220011;
+      display: block;
+    }
+    #controls {
+      color: #4a7a4a;
+      font-size: 0.78rem;
+      margin-top: 8px;
+      text-align: center;
+    }
+    #overlay {
+      position: absolute;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      pointer-events: none;
+      background: rgba(0,0,0,0.55);
+      width: 100%; height: 100%;
+      top: 0; left: 0;
+      border-radius: 2px;
+    }
+    #overlay h2 { color: #5ddb5d; font-size: 2.2rem; text-shadow: 0 0 25px #5ddb5d; }
+    #overlay p  { color: #ccc; font-size: 1rem; }
+    .btn {
+      background: #163816;
+      color: #5ddb5d;
+      border: 2px solid #5ddb5d;
+      padding: 11px 28px;
+      font-size: 1rem;
+      font-family: 'Courier New', monospace;
+      cursor: pointer;
+      border-radius: 4px;
+      letter-spacing: 2px;
+      pointer-events: all;
+      transition: all 0.2s;
+    }
+    .btn:hover { background: #225522; box-shadow: 0 0 16px #5ddb5d55; }
+    .mpad { display:flex; gap:15px; margin-top:10px; flex-wrap:wrap; justify-content:center; }
+    .mpad .row { display:flex; gap:15px; }
+  </style>
+</head>
+<body>
+  <h1>🐍 ESCAPA LA SERPIENTE</h1>
+  <div id="hud">
+    TIEMPO: <span id="time">0</span>s &nbsp;
+    RÉCORD: <span id="best">0</span>s &nbsp;
+    NIVEL:  <span id="level">1</span>
+  </div>
+
+  <div style="position:relative">
+    <canvas id="game" width="700" height="490"></canvas>
+    <div id="overlay">
+      <h2 id="oTitle">🐍 ESCAPA</h2>
+      <p  id="oMsg">Huye de la serpiente el mayor tiempo posible</p>
+      <p  style="color:#88ff88;font-size:.85rem">❄️ Congela &nbsp;·&nbsp; ⚡ Velocidad</p>
+      <button class="btn" id="startBtn" onclick="startGame()">▶ JUGAR</button>
+    </div>
+  </div>
+
+  <div id="controls">
+    WASD / ←↑↓→ Moverse &nbsp;|&nbsp; SHIFT Correr rápido
+  </div>
+  <div class="mpad">
+    <div class="row">
+      <button class="btn" ontouchstart="keys.up=true"    ontouchend="keys.up=false"    onmousedown="keys.up=true"    onmouseup="keys.up=false">▲</button>
+    </div>
+    <div class="row">
+      <button class="btn" ontouchstart="keys.left=true"  ontouchend="keys.left=false"  onmousedown="keys.left=true"  onmouseup="keys.left=false">◀</button>
+      <button class="btn" ontouchstart="keys.down=true"  ontouchend="keys.down=false"  onmousedown="keys.down=true"  onmouseup="keys.down=false">▼</button>
+      <button class="btn" ontouchstart="keys.right=true" ontouchend="keys.right=false" onmousedown="keys.right=true" onmouseup="keys.right=false">▶</button>
+    </div>
+  </div>
+
+<script>
+'use strict';
+const canvas = document.getElementById('game');
+const ctx    = canvas.getContext('2d');
+const W = canvas.width, H = canvas.height;
+
+// ── Keys ──────────────────────────────────────────────────────────────────────
+const keys = {};
+document.addEventListener('keydown', e => {
+  keys[e.key] = true;
+  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault();
+  syncArrows();
+});
+document.addEventListener('keyup', e => { keys[e.key] = false; syncArrows(); });
+function syncArrows() {
+  keys.up    = !!(keys['ArrowUp']    || keys['w'] || keys['W']);
+  keys.down  = !!(keys['ArrowDown']  || keys['s'] || keys['S']);
+  keys.left  = !!(keys['ArrowLeft']  || keys['a'] || keys['A']);
+  keys.right = !!(keys['ArrowRight'] || keys['d'] || keys['D']);
+  keys.run   = !!(keys['Shift'] || keys[' ']);
+}
+
+// ── Global state ──────────────────────────────────────────────────────────────
+let gameRunning = false, animId;
+let frameCount  = 0, best = 0, level = 1;
+let freezeTimer = 0, speedTimer = 0;
+let particles   = [], powerups = [], trees = [];
+
+// ── Tree generation ───────────────────────────────────────────────────────────
+function genTrees() {
+  trees = [];
+  const margin = 55;
+  for (let i = 0; i < 20; i++) {
+    let x, y, ok;
+    let tries = 0;
+    do {
+      ok = true;
+      x = margin + Math.random() * (W - margin * 2);
+      y = margin + Math.random() * (H - margin * 2);
+      if (Math.hypot(x - W/2, y - H/2) < 110) ok = false;
+      for (const t of trees)
+        if (Math.hypot(x - t.x, y - t.y) < 65) { ok = false; break; }
+    } while (!ok && ++tries < 60);
+    if (ok) trees.push({ x, y, r: 18 + Math.random() * 10, seed: Math.random() });
+  }
+}
+
+// ── Power-ups ─────────────────────────────────────────────────────────────────
+let powerupTick = 0;
+function spawnPowerup() {
+  if (powerups.length >= 3) return;
+  const type = Math.random() < 0.5 ? 'freeze' : 'speed';
+  let x, y, ok; let tries = 0;
+  do {
+    ok = true;
+    x = 40 + Math.random() * (W - 80);
+    y = 40 + Math.random() * (H - 80);
+    for (const t of trees)
+      if (Math.hypot(x - t.x, y - t.y) < t.r + 22) { ok = false; break; }
+  } while (!ok && ++tries < 50);
+  if (ok) powerups.push({ x, y, type, phase: Math.random() * Math.PI * 2 });
+}
+
+// ── Player ────────────────────────────────────────────────────────────────────
+let pl;
+function initPlayer() {
+  pl = { x: W / 2, y: H / 2, r: 9, angle: 0, frame: 0, fTick: 0, alive: true };
+}
+
+function updatePlayer() {
+  if (!pl.alive) return;
+  const spd = speedTimer > 0 ? 5.5 : (keys.run ? 4.5 : 3.2);
+
+  let dx = 0, dy = 0;
+  if (keys.left)  dx -= 1;
+  if (keys.right) dx += 1;
+  if (keys.up)    dy -= 1;
+  if (keys.down)  dy += 1;
+
+  if (dx !== 0 || dy !== 0) {
+    const len = Math.hypot(dx, dy);
+    dx /= len; dy /= len;
+    pl.angle = Math.atan2(dy, dx);
+    if (++pl.fTick > 7) { pl.fTick = 0; pl.frame = (pl.frame + 1) % 4; }
+  }
+
+  let nx = pl.x + dx * spd;
+  let ny = pl.y + dy * spd;
+  nx = Math.max(pl.r, Math.min(W - pl.r, nx));
+  ny = Math.max(pl.r, Math.min(H - pl.r, ny));
+
+  for (const t of trees) {
+    const d = Math.hypot(nx - t.x, ny - t.y);
+    if (d < t.r + pl.r) {
+      const a = Math.atan2(ny - t.y, nx - t.x);
+      nx = t.x + Math.cos(a) * (t.r + pl.r + 1);
+      ny = t.y + Math.sin(a) * (t.r + pl.r + 1);
+      nx = Math.max(pl.r, Math.min(W - pl.r, nx));
+      ny = Math.max(pl.r, Math.min(H - pl.r, ny));
+    }
+  }
+  pl.x = nx; pl.y = ny;
+
+  // Collect powerups
+  for (let i = powerups.length - 1; i >= 0; i--) {
+    const p = powerups[i];
+    if (Math.hypot(pl.x - p.x, pl.y - p.y) < pl.r + 14) {
+      if (p.type === 'freeze') { freezeTimer = 330; burst(p.x, p.y, '#88ddff', 20); }
+      else                     { speedTimer  = 210; burst(p.x, p.y, '#ffe044', 20); }
+      powerups.splice(i, 1);
+    }
+  }
+  if (freezeTimer > 0) freezeTimer--;
+  if (speedTimer  > 0) speedTimer--;
+}
+
+// ── Snake ─────────────────────────────────────────────────────────────────────
+let sn;
+const HEAD_R = 13, TAIL_R = 4;
+
+function initSnake() {
+  const sx = 60, sy = 60;
+  const angle = Math.PI / 4;
+  sn = {
+    path: [],
+    angle,
+    speed: 1.9,
+    bodyLen: 360,
+    tongueTick: 0,
+    tongueOut: 0,
+  };
+  // pre-fill path
+  for (let i = 0; i < 400; i++)
+    sn.path.push({ x: sx - Math.cos(angle) * i * 0.9, y: sy - Math.sin(angle) * i * 0.9 });
+}
+
+function snakeRadius(i, total) {
+  const t = i / total;
+  return TAIL_R + (HEAD_R - TAIL_R) * Math.pow(1 - t, 1.5);
+}
+
+function updateSnake() {
+  if (!pl.alive) return;
+  if (freezeTimer > 0) return;
+
+  const head = sn.path[0];
+  const tdx = pl.x - head.x, tdy = pl.y - head.y;
+  let steerAngle = Math.atan2(tdy, tdx);
+
+  // Avoid trees (weak steering)
+  let avx = 0, avy = 0;
+  for (const t of trees) {
+    const d = Math.hypot(head.x - t.x, head.y - t.y);
+    const avoid = t.r + 28;
+    if (d < avoid) {
+      const s = (avoid - d) / avoid;
+      avx += (head.x - t.x) / d * s;
+      avy += (head.y - t.y) / d * s;
+    }
+  }
+  if (avx !== 0 || avy !== 0) {
+    steerAngle = Math.atan2(Math.sin(steerAngle) + avy * 1.5, Math.cos(steerAngle) + avx * 1.5);
+  }
+
+  // Smooth turn
+  let diff = steerAngle - sn.angle;
+  while (diff >  Math.PI) diff -= Math.PI * 2;
+  while (diff < -Math.PI) diff += Math.PI * 2;
+  const turnRate = 0.048 + level * 0.004;
+  sn.angle += Math.max(-turnRate, Math.min(turnRate, diff));
+
+  // Move head
+  let hx = head.x + Math.cos(sn.angle) * sn.speed;
+  let hy = head.y + Math.sin(sn.angle) * sn.speed;
+  if (hx < 5  || hx > W - 5) { sn.angle = Math.PI - sn.angle; hx = Math.max(5, Math.min(W - 5, hx)); }
+  if (hy < 5  || hy > H - 5) { sn.angle = -sn.angle;          hy = Math.max(5, Math.min(H - 5, hy)); }
+  sn.path.unshift({ x: hx, y: hy });
+
+  // Trim to bodyLen
+  let len = 0;
+  for (let i = 1; i < sn.path.length; i++) {
+    len += Math.hypot(sn.path[i].x - sn.path[i-1].x, sn.path[i].y - sn.path[i-1].y);
+    if (len >= sn.bodyLen) { sn.path.length = i + 1; break; }
+  }
+
+  // Tongue
+  if (++sn.tongueTick > 50) { sn.tongueOut = 18; sn.tongueTick = 0; }
+  if (sn.tongueOut > 0) sn.tongueOut--;
+
+  // Collision with player
+  const checkCount = Math.min(Math.floor(HEAD_R * 3), sn.path.length);
+  for (let i = 0; i < checkCount; i++) {
+    const r = snakeRadius(i, sn.path.length);
+    if (Math.hypot(sn.path[i].x - pl.x, sn.path[i].y - pl.y) < r + pl.r - 3) {
+      pl.alive = false;
+      burst(pl.x, pl.y, '#ff4444', 35);
+      burst(pl.x, pl.y, '#ffaa00', 20);
+      setTimeout(gameOver, 900);
+      return;
+    }
+  }
+}
+
+// ── Draw snake ────────────────────────────────────────────────────────────────
+function drawSnake() {
+  const path = sn.path;
+  const n    = path.length;
+  if (n < 2) return;
+
+  // Drop shadow
+  ctx.save(); ctx.globalAlpha = 0.25;
+  for (let i = n - 1; i >= 0; i--) {
+    ctx.fillStyle = '#000';
+    ctx.beginPath();
+    ctx.arc(path[i].x + 4, path[i].y + 5, snakeRadius(i, n), 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1; ctx.restore();
+
+  // ── Body segments tail→head ─────────────────────────────────────────────────
+  for (let i = n - 1; i >= 0; i--) {
+    const t   = i / n;                // 0=head 1=tail
+    const r   = snakeRadius(i, n);
+
+    // Scale pattern: alternating saddle marks (like a python / boa)
+    const scaleCycle = i % 18;
+    const isDark     = scaleCycle < 8;
+
+    // Color: olive-green body, dark brown patches
+    const baseR = isDark ? 55  : 72;
+    const baseG = isDark ? 85  : 115;
+    const baseB = isDark ? 15  : 22;
+    // Slightly brighter toward the head
+    const boost = Math.floor((1 - t) * 25);
+    ctx.fillStyle = `rgb(${baseR + boost},${baseG + boost},${baseB})`;
+
+    ctx.beginPath();
+    ctx.arc(path[i].x, path[i].y, r, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Scale edge line every 6 segments
+    if (i % 6 === 0 && r > 6) {
+      ctx.strokeStyle = 'rgba(0,0,0,0.22)';
+      ctx.lineWidth   = 0.7;
+      ctx.beginPath();
+      ctx.arc(path[i].x, path[i].y, r, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // Dorsal highlight (subtle sheen on top of body)
+    if (r > 7) {
+      ctx.fillStyle = `rgba(200,255,140,${0.10 * (1 - t)})`;
+      ctx.beginPath();
+      ctx.ellipse(path[i].x - r * 0.2, path[i].y - r * 0.25, r * 0.42, r * 0.26, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // ── Head ───────────────────────────────────────────────────────────────────
+  const head  = path[0];
+  const angle = sn.angle;
+
+  ctx.save();
+  ctx.translate(head.x, head.y);
+  ctx.rotate(angle);
+
+  const r = HEAD_R;
+
+  // Head base: slightly flattened oval (wider rear, pointed front)
+  const grad = ctx.createRadialGradient(0, 0, 1, 0, 0, r * 1.8);
+  grad.addColorStop(0, '#6dba4a');
+  grad.addColorStop(1, '#2a6220');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.ellipse(r * 0.25, 0, r * 1.5, r * 1.0, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Central dark stripe
+  ctx.fillStyle = 'rgba(0,0,0,0.25)';
+  ctx.beginPath();
+  ctx.ellipse(r * 0.1, 0, r * 0.9, r * 0.45, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Head scute highlight
+  ctx.fillStyle = 'rgba(180,255,120,0.18)';
+  ctx.beginPath();
+  ctx.ellipse(-r * 0.1, -r * 0.32, r * 0.75, r * 0.28, 0.25, 0, Math.PI * 2);
+  ctx.fill();
+
+  // ── Eyes ──
+  const eyeX = r * 0.7, eyeY = r * 0.62;
+  // Iris (golden amber – typical python eyes)
+  ctx.fillStyle = '#c8a030';
+  ctx.beginPath(); ctx.ellipse(eyeX, -eyeY, r * 0.40, r * 0.44, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(eyeX,  eyeY, r * 0.40, r * 0.44, 0, 0, Math.PI * 2); ctx.fill();
+
+  // Vertical slit pupils
+  ctx.fillStyle = '#0a0a0a';
+  ctx.beginPath(); ctx.ellipse(eyeX, -eyeY, r * 0.11, r * 0.36, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(eyeX,  eyeY, r * 0.11, r * 0.36, 0, 0, Math.PI * 2); ctx.fill();
+
+  // Eye specular
+  ctx.fillStyle = 'rgba(255,255,255,0.65)';
+  ctx.beginPath(); ctx.arc(eyeX + r * 0.09, -eyeY - r * 0.10, r * 0.11, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(eyeX + r * 0.09,  eyeY - r * 0.10, r * 0.11, 0, Math.PI * 2); ctx.fill();
+
+  // Eye rim
+  ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 0.8;
+  ctx.beginPath(); ctx.ellipse(eyeX, -eyeY, r * 0.40, r * 0.44, 0, 0, Math.PI * 2); ctx.stroke();
+  ctx.beginPath(); ctx.ellipse(eyeX,  eyeY, r * 0.40, r * 0.44, 0, 0, Math.PI * 2); ctx.stroke();
+
+  // Nostrils
+  ctx.fillStyle = '#1a2e1a';
+  ctx.beginPath(); ctx.ellipse(r * 1.3, -r * 0.3, r * 0.13, r * 0.10, 0.3, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(r * 1.3,  r * 0.3, r * 0.13, r * 0.10, -0.3, 0, Math.PI * 2); ctx.fill();
+
+  // ── Tongue ──
+  if (sn.tongueOut > 0) {
+    const flick = sn.tongueOut > 9 ? 1 : -1;
+    const tLen  = r * 1.9;
+    const fLen  = r * 0.75;
+    ctx.save();
+    ctx.strokeStyle = '#dd1111';
+    ctx.lineWidth   = 2.2;
+    ctx.lineCap     = 'round';
+    // Base of tongue
+    ctx.beginPath();
+    ctx.moveTo(r * 1.35, flick * r * 0.05);
+    ctx.lineTo(r * 1.35 + tLen, 0);
+    ctx.stroke();
+    // Two fork tips
+    ctx.beginPath();
+    ctx.moveTo(r * 1.35 + tLen, 0);
+    ctx.lineTo(r * 1.35 + tLen + fLen, -r * 0.38);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(r * 1.35 + tLen, 0);
+    ctx.lineTo(r * 1.35 + tLen + fLen,  r * 0.38);
+    ctx.stroke();
+    // Tip dots
+    ctx.fillStyle = '#dd1111';
+    ctx.beginPath(); ctx.arc(r * 1.35 + tLen + fLen, -r * 0.38, 2.8, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(r * 1.35 + tLen + fLen,  r * 0.38, 2.8, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
+  ctx.restore();
+}
+
+// ── Draw player ───────────────────────────────────────────────────────────────
+function drawPlayer() {
+  if (!pl.alive) return;
+  const bob     = Math.sin(pl.frame * Math.PI / 2) * 2.5;
+  const legSwing= Math.sin(pl.frame * Math.PI / 2) * 9;
+  const running = keys.up || keys.down || keys.left || keys.right;
+
+  // Shadow
+  ctx.save();
+  ctx.globalAlpha = 0.28;
+  ctx.fillStyle = '#000';
+  ctx.beginPath();
+  ctx.ellipse(pl.x, pl.y + 12, pl.r * 0.9, pl.r * 0.35, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  ctx.restore();
+
+  ctx.save();
+  ctx.translate(pl.x, pl.y);
+
+  if (speedTimer > 0) { ctx.shadowColor = '#ffe044'; ctx.shadowBlur = 18; }
+
+  // Legs
+  ctx.fillStyle = '#2255cc';
+  ctx.fillRect(-6, 5 + bob + (running ? legSwing * 0.5 : 0), 5, 11);
+  ctx.fillRect( 1, 5 + bob - (running ? legSwing * 0.5 : 0), 5, 11);
+
+  // Shoes
+  ctx.fillStyle = '#111';
+  ctx.fillRect(-7, 15 + bob + (running ? legSwing * 0.5 : 0), 7, 4);
+  ctx.fillRect( 0, 15 + bob - (running ? legSwing * 0.5 : 0), 7, 4);
+
+  // Body / shirt
+  ctx.fillStyle = speedTimer > 0 ? '#ffaa00' : '#cc2222';
+  ctx.fillRect(-8, -7 + bob, 16, 15);
+
+  // Belt
+  ctx.fillStyle = '#444';
+  ctx.fillRect(-8, 6 + bob, 16, 3);
+
+  // Arms
+  ctx.fillStyle = '#e8aa78';
+  ctx.fillRect(-14, -6 + bob + (running ? -legSwing * 0.3 : 0), 7, 9);
+  ctx.fillRect(  7, -6 + bob + (running ?  legSwing * 0.3 : 0), 7, 9);
+
+  // Hands
+  ctx.fillStyle = '#e8aa78';
+  ctx.beginPath(); ctx.arc(-11, 3 + bob + (running ? -legSwing * 0.3 : 0), 3.5, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc( 11, 3 + bob + (running ?  legSwing * 0.3 : 0), 3.5, 0, Math.PI * 2); ctx.fill();
+
+  // Neck
+  ctx.fillStyle = '#e8aa78';
+  ctx.fillRect(-3, -11 + bob, 6, 5);
+
+  // Head
+  ctx.fillStyle = '#e8aa78';
+  ctx.beginPath();
+  ctx.arc(0, -17 + bob, 8, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Hair
+  ctx.fillStyle = '#3a1a0a';
+  ctx.beginPath();
+  ctx.ellipse(0, -22 + bob, 8, 5, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Eyes
+  const snakeDist = Math.hypot(sn.path[0].x - pl.x, sn.path[0].y - pl.y);
+  ctx.fillStyle = '#222';
+  ctx.beginPath(); ctx.arc(-3, -18 + bob, 1.8, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc( 3, -18 + bob, 1.8, 0, Math.PI * 2); ctx.fill();
+
+  // Mouth: scared open when snake is near
+  if (snakeDist < 120) {
+    ctx.strokeStyle = '#552222'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(0, -14 + bob, 3, 0.1, Math.PI - 0.1); ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+// ── Draw environment ──────────────────────────────────────────────────────────
+function drawBackground() {
+  // Checker grass
+  const ts = 40;
+  for (let x = 0; x < W; x += ts) {
+    for (let y = 0; y < H; y += ts) {
+      ctx.fillStyle = ((x / ts + y / ts) % 2 === 0) ? '#183318' : '#1c3a1c';
+      ctx.fillRect(x, y, ts, ts);
+    }
+  }
+  // Subtle noise patches
+  ctx.save(); ctx.globalAlpha = 0.06;
+  for (let i = 0; i < 60; i++) {
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc((i * 73 % W), (i * 113 % H), 18 + i % 15, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1; ctx.restore();
+}
+
+function drawTrees() {
+  // Shadows first
+  ctx.save(); ctx.globalAlpha = 0.35;
+  for (const t of trees) {
+    ctx.fillStyle = '#000';
+    ctx.beginPath();
+    ctx.ellipse(t.x + 6, t.y + 9, t.r * 0.85, t.r * 0.42, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1; ctx.restore();
+
+  // Trunk + canopy
+  for (const t of trees) {
+    // Trunk
+    ctx.fillStyle = '#4a2e14';
+    ctx.fillRect(t.x - 5, t.y - 3, 10, t.r + 8);
+
+    // Lower canopy
+    ctx.fillStyle = '#1a5518';
+    ctx.beginPath(); ctx.arc(t.x, t.y - 4, t.r * 1.0, 0, Math.PI * 2); ctx.fill();
+
+    // Middle canopy
+    ctx.fillStyle = '#247a22';
+    ctx.beginPath(); ctx.arc(t.x - 4 + t.seed * 6, t.y - 9, t.r * 0.78, 0, Math.PI * 2); ctx.fill();
+
+    // Top canopy
+    ctx.fillStyle = '#2e9e2c';
+    ctx.beginPath(); ctx.arc(t.x + 2 - t.seed * 4, t.y - 15, t.r * 0.58, 0, Math.PI * 2); ctx.fill();
+
+    // Highlight
+    ctx.fillStyle = 'rgba(120,220,80,0.18)';
+    ctx.beginPath(); ctx.arc(t.x - 3, t.y - 17, t.r * 0.3, 0, Math.PI * 2); ctx.fill();
+  }
+}
+
+function drawPowerups() {
+  for (const p of powerups) {
+    const bob = Math.sin(frameCount * 0.06 + p.phase) * 5;
+    ctx.save();
+    ctx.translate(p.x, p.y + bob);
+    if (p.type === 'freeze') {
+      ctx.shadowColor = '#88ddff'; ctx.shadowBlur = 18;
+      // Draw ice crystal manually
+      ctx.strokeStyle = '#88ddff'; ctx.lineWidth = 2.5;
+      for (let a = 0; a < 3; a++) {
+        ctx.save(); ctx.rotate(a * Math.PI / 3);
+        ctx.beginPath(); ctx.moveTo(0, -12); ctx.lineTo(0, 12); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(-5, -6); ctx.lineTo(5, -6); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(-5,  6); ctx.lineTo(5,  6); ctx.stroke();
+        ctx.restore();
+      }
+      ctx.fillStyle = '#cceeff';
+      ctx.beginPath(); ctx.arc(0, 0, 4, 0, Math.PI * 2); ctx.fill();
+    } else {
+      ctx.shadowColor = '#ffe044'; ctx.shadowBlur = 18;
+      ctx.fillStyle = '#ffe044';
+      // Lightning bolt
+      ctx.beginPath();
+      ctx.moveTo(4, -12); ctx.lineTo(-2, -1); ctx.lineTo(2, -1);
+      ctx.lineTo(-4,  12); ctx.lineTo(2, 1); ctx.lineTo(-2, 1); ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+}
+
+function drawHUDOverlay() {
+  if (freezeTimer > 0) {
+    // Blue tint
+    ctx.fillStyle = 'rgba(100,190,255,0.06)';
+    ctx.fillRect(0, 0, W, H);
+    // Frost corners
+    for (let c = 0; c < 4; c++) {
+      const cx = c % 2 === 0 ? 0 : W;
+      const cy = c < 2 ? 0 : H;
+      const grd = ctx.createRadialGradient(cx, cy, 0, cx, cy, 120);
+      grd.addColorStop(0, 'rgba(150,220,255,0.18)');
+      grd.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = grd;
+      ctx.fillRect(0, 0, W, H);
+    }
+    ctx.fillStyle = '#aaeeff';
+    ctx.font = 'bold 13px Courier New';
+    ctx.fillText(`❄ SERPIENTE CONGELADA ${(freezeTimer / 60).toFixed(1)}s`, 10, 22);
+  }
+  if (speedTimer > 0) {
+    ctx.fillStyle = '#ffe044';
+    ctx.font = 'bold 13px Courier New';
+    ctx.fillText(`⚡ VELOCIDAD ${(speedTimer / 60).toFixed(1)}s`, 10, freezeTimer > 0 ? 42 : 22);
+  }
+
+  // Vignette
+  const vig = ctx.createRadialGradient(W / 2, H / 2, H * 0.28, W / 2, H / 2, H * 0.82);
+  vig.addColorStop(0, 'rgba(0,0,0,0)');
+  vig.addColorStop(1, 'rgba(0,0,0,0.52)');
+  ctx.fillStyle = vig;
+  ctx.fillRect(0, 0, W, H);
+}
+
+// ── Particles ─────────────────────────────────────────────────────────────────
+function burst(x, y, color, n) {
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const s = Math.random() * 4 + 1.5;
+    particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 2,
+                     life: 1, color, size: Math.random() * 5 + 2 });
+  }
+}
+function updateParticles() {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx; p.y += p.vy; p.vy += 0.14; p.life -= 0.022;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+}
+function drawParticles() {
+  for (const p of particles) {
+    ctx.globalAlpha = p.life;
+    ctx.fillStyle   = p.color;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ── Level / HUD text ──────────────────────────────────────────────────────────
+function updateTextHUD() {
+  document.getElementById('time').textContent  = Math.floor(frameCount / 60);
+  document.getElementById('best').textContent  = best;
+  document.getElementById('level').textContent = level;
+}
+
+// ── Game flow ─────────────────────────────────────────────────────────────────
+function startGame() {
+  document.getElementById('overlay').style.display = 'none';
+  genTrees();
+  initPlayer();
+  initSnake();
+  particles  = [];
+  powerups   = [];
+  powerupTick= 0;
+  freezeTimer= 0;
+  speedTimer = 0;
+  frameCount = 0;
+  level      = 1;
+  gameRunning= true;
+  if (animId) cancelAnimationFrame(animId);
+  loop();
+}
+
+function gameOver() {
+  gameRunning = false;
+  const secs = Math.floor(frameCount / 60);
+  if (secs > best) best = secs;
+  document.getElementById('oTitle').textContent = '💀 ATRAPADO';
+  document.getElementById('oMsg').textContent   = `Sobreviviste ${secs} segundos`;
+  document.getElementById('startBtn').textContent = '↺ REINTENTAR';
+  document.getElementById('overlay').style.display = 'flex';
+}
+
+// ── Main loop ─────────────────────────────────────────────────────────────────
+function loop() {
+  animId = requestAnimationFrame(loop);
+  if (!gameRunning) return;
+
+  frameCount++;
+
+  // Level-up every 20 s
+  if (frameCount % 1200 === 0) {
+    level++;
+    sn.speed    = Math.min(1.9 + level * 0.4, 4.5);
+    sn.bodyLen  = Math.min(360 + level * 40, 700);
+  }
+
+  // Powerup spawner
+  if (++powerupTick > 300) { powerupTick = 0; spawnPowerup(); }
+
+  // Update
+  updatePlayer();
+  updateSnake();
+  updateParticles();
+
+  // Draw
+  ctx.clearRect(0, 0, W, H);
+  drawBackground();
+  drawTrees();
+  drawPowerups();
+  drawSnake();
+  drawPlayer();
+  drawParticles();
+  drawHUDOverlay();
+
+  updateTextHUD();
+}
+
+// ── Idle render (show snake animated on title) ────────────────────────────────
+(function idle() {
+  if (gameRunning) return;
+  requestAnimationFrame(idle);
+  frameCount++;
+  ctx.clearRect(0, 0, W, H);
+  drawBackground();
+  drawTrees();
+  // Vignette
+  const vig = ctx.createRadialGradient(W / 2, H / 2, H * 0.2, W / 2, H / 2, H * 0.85);
+  vig.addColorStop(0, 'rgba(0,0,0,0)');
+  vig.addColorStop(1, 'rgba(0,0,0,0.7)');
+  ctx.fillStyle = vig;
+  ctx.fillRect(0, 0, W, H);
+})();
+</script>
+</body>
+</html>
